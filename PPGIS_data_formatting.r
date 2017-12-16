@@ -12,6 +12,7 @@ library(tidyverse)
 
 #Load datasets
 interviewDF <- readxl::read_excel("Interview data/checked data/TUNDRA_Access_171116_CR.xlsx", sheet = "Interviewee Key")
+colheaders <- readxl::read_excel("PPGIS_CONNECT/Raw/List_of_shp_column_headers.xlsx", sheet = "Sheet1")
 
 ###############
 #Norway
@@ -69,18 +70,55 @@ idcodereplace <- lapply(dirlist, shpdir){
 write.csv(idcodereplace, paste0("PPGIS_CONNECT/Processed/CONNECT/Russia/checkidcodereplacement.csv")
 
 #Merge shps was done in ArcGIS because it is quicker
-#reproject to lambert azimuthal - this was done in ArcGIS (check because I don't trust R to do it correctly
+#reproject to lambert azimuthal - this was done in ArcGIS (checked preserve shape; because I don't trust R to do it correctly)
 
 ###############
 #Canada
 ###############
+#These are in GCS_North_America_1983 which is EPSG:4269
 
+#filelist <- list.files("PPGIS_CONNECT/Raw/TUNDRA_Shapefiles_Canada", pattern="append", full.names = TRUE) 
+#filelist <- grep(".shp$", filelist, value=TRUE)
+#shpList <- lapply(filelist, function(currfile) read_sf(currfile))
+#canadaShp <- do.call(rbind, shpList)
+#st_write(canadaShp, paste0("PPGIS_CONNECT/Processed/CONNECT/Canada/"))
+
+#Merge shps was done in ArcGIS because it is quicker
+#reproject to lambert azimuthal - this was done in ArcGIS (checked preserve shape; because I don't trust R to do it correctly)
+
+#reformat columns
+canadaShp <- read_sf("PPGIS_CONNECT/Processed/Canada/Canada_allpolygons_laea.shp")
 
 ###############
 #Alaska
 ###############
- 
+#reproject to lambert azimuthal - this was done in ArcGIS (checked preserve shape; because I don't trust R to do it correctly)
 
+# Read the feature class
+alaskaShp <- read_sf(dsn="PPGIS_CONNECT/Processed/CONNECT/Alaska.gdb",layer="Alaska_allpolygons_laea")
+
+#rename column headers
+names(alaskaShp)[1:49] <- colheaders$Alaska_rename[1:49]
+
+
+#split the polygon id from column UniqueID2 (format = 6 digit interviewee id 2 digit polygon id). Add 1 because they start at zero
+alaskaShp$AA_Number <- (as.numeric(do.call(rbind, lapply(alaskaShp$UniqueID2, function (x) str_split(x, "_")[[1]][3]))) +1)
+
+#split cabin and camp
+
+#what to do with duplicated columns?
+
+#pull I_ who they go with from notes
+
+#N_Nights from Length column
+
+#N_Length from Frequency and from Notes
+
+#N_Season from Frequency and Notes
+
+#G what they do from Notes
+
+#H how they travel from Notes
 
 
 
