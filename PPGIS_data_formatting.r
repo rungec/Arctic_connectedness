@@ -40,17 +40,24 @@ namefun <- function(shpdir) {
   return(filelist)
 }
 #Extract the interviewee name from the shapefile name
-idcodereplace <- lapply(dirlist, shpdir){
+idcodereplace <- lapply(dirlist, function(shpdir) {
   #list shp files in directory
   filelist <- list.files(shpdir, "*.shp$", full.names=TRUE)
   codeDF <- c()
   
   for (currfile in filelist) {
+    print(paste0("Starting ", currfile))
     #extract the name
     splitnames <- gsub("-", "_", basename(currfile)) %>% str_split("_")
     #recombine to match the interviewee column in .xlsx
+    if(is.numeric(splitnames[[1]][3])) {
     idfromshpname <- paste(splitnames[[1]][1], sprintf("%03d", as.numeric(splitnames[[1]][3])), sep="_")
-    
+    } else {
+      m <- gregexpr('[0-9]+',splitnames[[1]][3] ) #if there are letters in the shp name eg A1 extract only the numbers eg. 01
+      splitnames[[1]][3] <- regmatches(splitnames[[1]][3], m)
+    idfromshpname <- paste(splitnames[[1]][1], sprintf("%03d", as.numeric(splitnames[[1]][3])), sep="_")  
+    }
+    print(idfromshpname)
     #extract the idcode to match
     idcode <- interviewDF[which(interviewDF$Interviewee==idfromshpname), 1:2]
     codeDF <- rbind(codeDF, c(idcode, basename(currfile)))
@@ -59,15 +66,15 @@ idcodereplace <- lapply(dirlist, shpdir){
     currshp <- read_sf(currfile)
     
     #replace code
-    currshp$ID <- idcode[1]
+    currshp[, "Id"] <- idcode[1]
     
     #save shp
     st_write(currshp, paste0("PPGIS_CONNECT/Processed/CONNECT/Russia/", basename(currfile)))
   }
   return(codeDF)
-}  
-
-write.csv(idcodereplace, paste0("PPGIS_CONNECT/Processed/CONNECT/Russia/checkidcodereplacement.csv")
+} ) 
+idcodereplace <- do.call(rbind, idcodereplace)
+write.csv(idcodereplace, paste0("PPGIS_CONNECT/Processed/CONNECT/Russia/checkidcodereplacement.csv"))
 
 #Merge shps was done in ArcGIS because it is quicker
 #reproject to lambert azimuthal - this was done in ArcGIS (checked preserve shape; because I don't trust R to do it correctly)
