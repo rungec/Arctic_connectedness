@@ -8,7 +8,7 @@ library(sf)
 library(tidyverse)
 
 #Set options
-
+options(stringsAsFactors = FALSE)
 
 #Load datasets
 interviewDF <- readxl::read_excel("Interview data/checked data/TUNDRA_Access_171116_CR.xlsx", sheet = "Interviewee Key")
@@ -23,9 +23,9 @@ colheaders <- readxl::read_excel("PPGIS_CONNECT/Raw/List_of_shp_column_headers.x
 #Russia
 ###############
 #Russia data column names are good, just need to add interviewee ID to each row, and merge all the shps.
-#Merge shps was done in ArcGIS because it is quicker
 #reproject to lambert azimuthal - this was done in ArcGIS, I don't trust R to do it correctly
 
+#1. Fill in the interviewee ID column ####
 
 dirlist <- list("PPGIS_CONNECT/Raw/TUNDRA_Shapefiles_Russia/Murmansk/Shape", 
                 "PPGIS_CONNECT/Raw/TUNDRA_Shapefiles_Russia/Taimyr/Shape",
@@ -76,8 +76,48 @@ idcodereplace <- lapply(dirlist, function(shpdir) {
 idcodereplace <- do.call(rbind, idcodereplace)
 write.csv(idcodereplace, paste0("PPGIS_CONNECT/Processed/CONNECT/Russia/checkidcodereplacement.csv"))
 
-#Merge shps was done in ArcGIS because it is quicker
-#reproject to lambert azimuthal - this was done in ArcGIS (checked preserve shape; because I don't trust R to do it correctly)
+# 2. Merge shps #### 
+#they have different numbers of columns so we do a bit of pre-processing
+procfiles <- list.files("PPGIS_CONNECT/Processed/CONNECT/Russia/", "*.shp$", full.names=TRUE)
+# make a list of all the column headers in the .shps
+coldf <- data.frame()
+currnames <- c()
+for(i in procfiles) {
+  x <- read_sf(i)
+  currrow <- data.frame(as.character(basename(i)), ncol(x), nrow(x))
+  coldf <- rbind(coldf, currrow)
+  currnames <- append(currnames, names(x))
+}
+uniquecols <- unique(currnames)
+
+procfiles <- list.files("PPGIS_CONNECT/Processed/CONNECT/Russia/", "*.shp$", full.names=TRUE)
+# make all the shps have the same column headers
+tempfileList <- lapply(procfiles, function (x) {
+  currshp <-  read_sf(x)
+  #pull out the missing columns headers
+  fillcols <- uniquecols[which(!uniquecols %in% names(currshp))]
+  #append these columns (filled with NAs) to the current shapefile
+  filldf <- matrix(data=as.character(NA), nrow=nrow(currshp), ncol=length(fillcols), dimnames=list(NULL, fillcols))
+  currshp_full <- cbind(currshp, filldf)
+  #they all have different crs (all stereographic polar, but lon ranges from 35 to 100), reproject
+  currshp_full <- st_transform(currshp_full, "+proj=stere +lat_0=90 +lat_ts=90 +lon_0=50 +k=1 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs")
+  return(currshp_full)
+})
+
+#finally merge the .shps
+#For polygons ####
+polids <- which(grepl("*pol.shp$", procfiles))
+russiashp_pol <- do.call(rbind, tempfileList[polids])
+write_sf(russiashp_pol, "PPGIS_CONNECT/Processed/CONNECT/Russia/combined/Russia_allpolygons_stereopolarWGS84.shp")
+
+#finally merge the .shps
+#For lines ####
+linids <- which(grepl("*lin.shp$", procfiles))
+russiashp_lin <- do.call(rbind, tempfileList[linids])
+write_sf(russiashp_lin, "PPGIS_CONNECT/Processed/CONNECT/Russia/combined/Russia_alllines_stereopolarWGS84.shp")
+
+#3. reproject to lambert azimuthal ####
+#this was done in ArcGIS (checked preserve shape; because I don't trust R to do it correctly)
 
 ###############
 #Canada
